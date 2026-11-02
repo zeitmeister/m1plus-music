@@ -3,7 +3,7 @@ UV ?= uv
 RUN = $(UV) run --locked python -I
 BUILD ?= latest
 VOLUME ?= /Volumes/Music
-CLANG_FORMAT ?= $(if $(LLVM_BIN),$(LLVM_BIN),/opt/homebrew/opt/llvm/bin)/clang-format
+CLANG_FORMAT ?= $(if $(LLVM_BIN),$(LLVM_BIN)/clang-format,$(or $(wildcard /opt/homebrew/opt/llvm/bin/clang-format),clang-format))
 C_SOURCES := $(shell git ls-files 'patch/*.c' 'patch/*.h')
 
 .PHONY: help setup doctor test dev preview flash check accept publish clean format format-check lint

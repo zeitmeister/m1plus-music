@@ -26,16 +26,16 @@ Usage: pod.py WORKDIR
 import argparse, concurrent.futures, hashlib, json, os, pathlib, re, stat, struct, subprocess, sys
 from elftools.elf.elffile import ELFFile
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-import pod_pages, pod_ui
+import pod_pages, pod_ui, workflow
 from build import TAG, about   # the About row of the iPod page shows about(tag) (patch/m1plus.c M1PLUS_TAG)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATCH = os.path.join(ROOT, 'patch')
 DEMO = 'release/bin/demo'
 
-# Toolchain: Homebrew LLVM/LLD (Apple clang has no MIPS target). Override with $LLVM_BIN / $LLD_BIN.
-LLVM = os.environ.get('LLVM_BIN', '/opt/homebrew/opt/llvm/bin')
-LLD = os.environ.get('LLD_BIN', '/opt/homebrew/opt/lld/bin')
+# Toolchain: $LLVM_BIN / $LLD_BIN, else Homebrew LLVM/LLD (Apple clang has no MIPS target), else clang / ld.lld on PATH (workflow.tool_dir).
+LLVM = workflow.llvm_bin()
+LLD = workflow.lld_bin()
 CLANG = os.path.join(LLVM, 'clang')
 OBJCOPY = os.path.join(LLVM, 'llvm-objcopy')
 LD = os.path.join(LLD, 'ld.lld')

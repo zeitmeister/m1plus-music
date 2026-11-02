@@ -2,7 +2,7 @@
 
 All mutable state stays in this checkout. Nothing here changes firmware bytes.
 """
-import contextlib, fcntl, hashlib, importlib.metadata, json, os, signal, subprocess, sys, tempfile
+import contextlib, fcntl, hashlib, importlib.metadata, json, os, shutil, signal, subprocess, sys, tempfile
 from pathlib import Path
 
 import paths
@@ -61,9 +61,23 @@ def source_key():
     return digest(entries)
 
 
+HOMEBREW_LLVM, HOMEBREW_LLD = '/opt/homebrew/opt/llvm/bin', '/opt/homebrew/opt/lld/bin'
+
+
+def tool_dir(env, homebrew, tool):
+    """$env, else Homebrew's directory (macOS: Apple clang has no MIPS target), else the directory of tool on PATH (Linux: /usr/bin)."""
+    if os.environ.get(env): return os.environ[env]
+    if os.path.isdir(homebrew): return homebrew
+    found = shutil.which(tool)
+    return os.path.dirname(found) if found else homebrew
+
+
+def llvm_bin(): return tool_dir('LLVM_BIN', HOMEBREW_LLVM, 'clang')
+def lld_bin(): return tool_dir('LLD_BIN', HOMEBREW_LLD, 'ld.lld')
+
+
 def environment():
-    llvm = os.environ.get('LLVM_BIN', '/opt/homebrew/opt/llvm/bin')
-    lld = os.environ.get('LLD_BIN', '/opt/homebrew/opt/lld/bin')
+    llvm, lld = llvm_bin(), lld_bin()
     out = {'python': sys.version, 'requirements': {}}
     for package in ('capstone', 'pyelftools', 'pillow', 'fonttools', 'unicorn'):
         try: out['requirements'][package] = importlib.metadata.version(package)

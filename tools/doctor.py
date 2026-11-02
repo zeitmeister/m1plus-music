@@ -39,7 +39,7 @@ def main():
     import build, mod_font
     for label, path, want in [('firmware', paths.ZIP, build.ZIP_SHA), ('Source Han Sans', paths.SHS_ZIP, mod_font.SHS_ZIP_SHA)]:
         check(label, os.path.isfile(path) and workflow.sha(path) == want, path)
-    llvm = os.environ.get('LLVM_BIN', '/opt/homebrew/opt/llvm/bin')
+    llvm = workflow.llvm_bin()
     try:
         targets = subprocess.run([os.path.join(llvm, 'clang'), '--print-targets'], capture_output=True, text=True, timeout=10)
         check('clang MIPS target', targets.returncode == 0 and 'mipsel' in targets.stdout)

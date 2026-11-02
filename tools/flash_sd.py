@@ -2,16 +2,19 @@
 """Copy a package to the player's TF card as update.bin, with the checks that have been skipped before.
 
   make flash [BUILD=latest] [VOLUME=/Volumes/Music] [DRY_RUN=1]
+  make flash VOLUME=/run/media/$USER/<card>              (Linux)
   uv run python -I tools/flash_sd.py PACKAGE [--dry-run] [--no-eject]
 
 Refuses unless
   - `fwtool verify` passes on PACKAGE, and
   - PACKAGE's SHA-256 is in test/golden.sha256, or --build selects a complete, matching dev test receipt;
-  - the volume is a card: `diskutil info` Protocol is Secure Digital or USB, it holds the player's
+  - the volume is a card: macOS `diskutil info` Protocol is Secure Digital or USB, Linux `lsblk`
+    transport of the disk under the mount is usb or mmc (or an mmcblk device); it holds the player's
     .downpic or Music folder, and it is not the SanDisk Extreme USB SSD.
 Then shows the update.bin already on the card (version = firmware_v20.info line 2, SHA-256), copies
-with `cp -X` (no AppleDouble), removes ._update.bin, syncs, re-hashes and compares, prints the
-version found on the card, and ejects (--no-eject to keep it mounted). macOS only.
+(macOS `cp -X`: no AppleDouble, and ._update.bin removed), syncs, re-hashes and compares, prints the
+version found on the card, and ejects (--no-eject to keep it mounted): macOS `diskutil eject`, Linux
+`udisksctl unmount` and `power-off` of the disk.
 """
 import argparse, hashlib, os, subprocess, sys, tarfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -43,8 +46,37 @@ def diskutil(vol):
     if r.returncode: sys.exit(f'diskutil info {vol} failed: {r.stderr.strip()}')
     return {k.strip().lower(): v.strip() for k, v in (l.split(':', 1) for l in r.stdout.splitlines() if ':' in l)}
 
+MACOS = sys.platform == 'darwin'
+
+
+def out(*cmd):
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode: sys.exit(f'{" ".join(cmd)} failed: {r.stderr.strip()}')
+    return r.stdout.strip()
+
+
+def linux_disk(vol):
+    """The partition mounted at vol and the whole disk it is on (/dev/sdb1, /dev/sdb)."""
+    part = out('findmnt', '-no', 'SOURCE', '--mountpoint', vol)
+    parent = out('lsblk', '-ndo', 'PKNAME', part)
+    return part, '/dev/' + parent if parent else part
+
+
+def check_linux(vol):
+    part, disk = linux_disk(vol)
+    tran, model = out('lsblk', '-ndo', 'TRAN', disk).lower(), out('lsblk', '-ndo', 'VENDOR,MODEL', disk)
+    if any(f in model.lower() for f in FORBIDDEN): sys.exit(f'{vol} is the USB SSD ({FORBIDDEN[0]}): never a flash target')
+    if tran not in ('usb', 'mmc') and not os.path.basename(disk).startswith('mmcblk'):
+        sys.exit(f'{vol}: {disk} transport {tran!r}, want usb or mmc (a card reader)')
+    if not any(os.path.exists(os.path.join(vol, n)) for n in ('.downpic', 'Music')):
+        sys.exit(f'{vol} has no .downpic or Music folder: not the player\'s card')
+    print(f'card: {vol}  {part} on {disk}  {model}  transport {tran or "mmc"}')
+
+
 def check_volume(vol):
-    if not os.path.ismount(vol): sys.exit(f'{vol} is not a mounted volume')
+    if not os.path.ismount(vol):
+        sys.exit(f'{vol} is not a mounted volume' + ('' if MACOS else ' (on Linux pass the card\'s mount point: make flash VOLUME=/run/media/$USER/<card>)'))
+    if not MACOS: return check_linux(vol)
     info = diskutil(vol)
     blob = ' '.join(info.values()).lower()
     if any(f in blob for f in FORBIDDEN): sys.exit(f'{vol} is the USB SSD ({FORBIDDEN[0]}): never a flash target')
@@ -60,7 +92,7 @@ def main():
     source = ap.add_mutually_exclusive_group(required=True)
     source.add_argument('package', nargs='?', help='an accepted release/restore package')
     source.add_argument('--build', help='a fully tested dev build directory, or latest')
-    ap.add_argument('--volume', default='/Volumes/Music')
+    ap.add_argument('--volume', default='/Volumes/Music', help='the card\'s mount point (Linux: e.g. /run/media/$USER/<card>)')
     ap.add_argument('--dry-run', action='store_true'); ap.add_argument('--no-eject', action='store_true')
     a = ap.parse_args()
     receipt = None
@@ -84,8 +116,9 @@ def main():
         try: print(f'on the card now: update.bin version {version(dst)}  sha256 {sha256(dst)}')
         except (tarfile.TarError, KeyError, OSError) as e: print(f'on the card now: update.bin (unreadable: {e})')
     else: print('on the card now: no update.bin')
-    if a.dry_run: print(f'dry run: would cp -X to {dst}, remove ._update.bin, sync, compare, {"leave mounted" if a.no_eject else "eject"}'); return
-    subprocess.run(['cp', '-X', pkg, dst], check=True)
+    if a.dry_run: print(f'dry run: would copy to {dst}{", remove ._update.bin" if MACOS else ""}, sync, compare, {"leave mounted" if a.no_eject else "eject"}'); return
+    disk = None if MACOS else linux_disk(a.volume)
+    subprocess.run(['cp', '-X', pkg, dst] if MACOS else ['cp', pkg, dst], check=True)
     junk = os.path.join(a.volume, '._update.bin')
     if os.path.exists(junk): os.remove(junk)
     subprocess.run(['sync'], check=True)
@@ -93,8 +126,12 @@ def main():
     if got != sha: sys.exit(f'COPY MISMATCH: card has {got}, wanted {sha}. Do not flash; copy again.')
     print(f'copied and verified: update.bin on the card is {version(dst)} ({got[:16]}…)')
     if a.no_eject: print('left mounted (--no-eject)')
-    else:
+    elif MACOS:
         subprocess.run(['diskutil', 'eject', a.volume], check=True)
+    else:
+        subprocess.run(['udisksctl', 'unmount', '-b', disk[0]], check=True)
+        if subprocess.run(['udisksctl', 'power-off', '-b', disk[1]]).returncode:   # a built-in reader may refuse: unmounted is enough
+            print('unmounted (the reader could not be powered off; safe to remove)')
     print('Next: System settings -> System Update -> TF card update.')
 
 if __name__ == '__main__': main()
