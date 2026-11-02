@@ -501,6 +501,7 @@ TAPE_PINS = (   # (address, stock word, what it proves): the Tape page invalidat
     (0x667d84, 0x3c1c003a, 'widget_get_text_utf8 prologue'), (0x667d88, 0x279cc14c, 'widget_get_text_utf8 prologue'), (0x667d8c, 0x0399e021, 'widget_get_text_utf8 prologue'),
 )
 FUNCTIONS['get_playtime'] = ('int', 'void', 0x4e02e4)   # the position the stock lyric timers compare "lrc_time" with (docs/modules/lyrics.md)
+FUNCTIONS['mclLoadExLyric'] = ('void', 'void', 0x5d41e4)   # the playing track's lyrics read again (its lock, its deque); Cover & Lyrics after Save Lyrics, as stock's own lyric save (docs/modules/onlineart.md)
 LYRICS_PINS = (   # (address, stock word, what it proves): the stock lyric rows patch/lyrics.c reads (docs/modules/lyrics.md)
     (0x4e02e4, 0x3c1c0052, 'get_playtime prologue'), (0x4e02e8, 0x279c3bec, 'get_playtime prologue'), (0x4e02ec, 0x0399e021, 'get_playtime prologue'),
     (0x751c3c, 0x6f726373, 'the string "scroll_lrc" (the list the stock timers fill)'), (0x751c40, 0x6c5f6c6c, '"scroll_lrc"'), (0x751c44, 0x00006372, '"scroll_lrc"'),
@@ -513,6 +514,10 @@ LYRICS_PINS = (   # (address, stock word, what it proves): the stock lyric rows 
     (0x4e0544, 0x3c1c0052, 'seek_time prologue (the tap-to-seek call; also pinned by PODCAST_PINS)'),
     (0x62e9f8, 0x24a5add8, 'label paint (the line_wrap branch): a1 = "spacer" (0x75add8), the style int that sets the row pitch'), (0x62ea04, 0x9615000c, 'label paint: lhu s5, 0xc(canvas) = the font size'),
     (0x62ea24, 0x02a29821, 'label paint: row pitch s3 = font size + style "spacer" (default 2): LY_LINE_H = LY_FONT + the style\'s spacer'),
+    (0x5d41e4, 0x3c1c0043, 'mclLoadExLyric prologue'), (0x5d41e8, 0x279cfcec, 'mclLoadExLyric prologue'), (0x5d41ec, 0x0399e021, 'mclLoadExLyric prologue'),
+    (0x537cbc, 0x8f99c220, 'stock\'s online lyric save (the handler at 0x5377ec, UI thread): lw t9, GOT mclLoadExLyric'), (0x537cc0, 0x0320f809, 'stock\'s lyric save: jalr mclLoadExLyric, no arguments'),
+    (0x537cd8, 0xa0430000, 'stock\'s lyric save: sb 1, force_refreshflag (0xa05a63) right after the reload'),
+    (0x53bb74, 0x92820000, 'show_player_face (Now Playing\'s refresh): lbu v0, force_refreshflag'), (0x53bb78, 0x104000e0, 'show_player_face: set, the lyric rows are rebuilt (0x539690)'),
     (0x650ebc, 0x1440ffcf, 'font_manager_get_font: a font name that cannot be loaded is retried with the default font name (the fallback of np_lyric_style when lyrics.ttf is missing); no per-glyph fallback'),
 )
 # The library scan's folder walk (patch/common.c pod_scan_dir, docs/modules/payload.md hook 5): toolsLoadAllFile (0x5efd98) lists each folder with the function at 0x5ea364 (readdir

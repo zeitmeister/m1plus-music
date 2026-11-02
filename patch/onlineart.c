@@ -1026,6 +1026,9 @@ static int oa_on_save(void *ctx, void *e) {
     (void)e;
     if (oa.mode != 2 || !oa.lw || oa.nln <= 0) return RET_OK;
     if (pn_lyr_save(oa.di, oa.lrc)) {
+        /* stock's own lyric save (0x537cbc): the playing track's lyrics read again and Now Playing told to rebuild its rows, so they show without a restart */
+        mclLoadExLyric();
+        *(unsigned char *)FORCE_REFRESH = 1;
         oa.saved |= 1u << oa.di;
         oa.save_failed = 0;
         oa_leave();

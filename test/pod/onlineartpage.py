@@ -586,8 +586,13 @@ def lyrics_tests(ctx):
     ys = [r[1] for t, r in texts]
     expect(ys == [8 + 24 * i for i in range(len(ys))] and all(r[0] == 16 and r[2] == 288 and r[3] == 24 for _, r in texts), f'lines {24} px apart from y 8, 288 px wide ({ys})')
     expect(set(m.text_styles) == {'label_line'}, 'in the lyrics text style')
+    refresh = pod.DATA['FORCE_REFRESH'][0]
+    m.u.mem_write(refresh, b'\0'); m.calls = []
     m.click('oa_lsave')
     expect(m.fs[LRC].startswith(b'[ar:Queen]') and LRC + '.tmp' not in m.fs and m.fs[LRC].endswith(b'\xe2\x99\xaa\n'), 'the pill replaces <track>.lrc, the file name\'s extension replaced by .lrc, atomically, with the timestamps (the display strips them, the file does not)')
+    names = [c[0] for c in m.calls]
+    expect('mclLoadExLyric' in names and names.index('mclLoadExLyric') > max(i for i, c in enumerate(m.calls) if c[0] == 'rename') and m.u.mem_read(refresh, 1) == b'\1',
+           'after the write, as stock\'s own lyric save: mclLoadExLyric and force_refreshflag set, so Now Playing shows the lyrics without a restart')
     expect(m.shown('oa_chips') and not m.shown('oa_dh_title') and not m.shown('oa_lsave'), 'then the rows again')
     _, fills, texts = m.paint()
     expect(('Saved' in [t for t, _ in texts]) and [t for t, _ in texts].count('Synced') == 1 and any(f[0] == SAVED_RGB for f in fills) and not any(f[0] == SYNCED_RGB and f[2] < 14 for f in fills),
@@ -613,8 +618,10 @@ def lyrics_tests(ctx):
     # a card that cannot be written
     m = AM(OA.Site()); m.open(); m.ready(); m.open_lyrics(0)
     m.fail = {('write', LRC + '.tmp')}
+    m.u.mem_write(refresh, b'\0'); m.calls = []
     m.click('oa_lsave')
     expect(m.shown('oa_dh_title') and m.text('oa_dh_sub') == 'Storage unavailable' and m.shown('oa_lsave') and LRC not in m.fs, 'a write that fails: "Storage unavailable" in the header\'s grey line, the pill stays for another try')
+    expect(('mclLoadExLyric',) not in m.calls and m.u.mem_read(refresh, 1) == b'\0', 'a failed write reloads nothing')
     m.fail = set()
     m.click('oa_lsave')
     expect(m.fs[LRC].startswith(b'[ar:Queen]') and m.shown('oa_chips'), 'and the next try writes it')

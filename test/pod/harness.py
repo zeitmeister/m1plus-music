@@ -1021,6 +1021,8 @@ class Machine:
         # ---- libcurl's easy interface, the Wi-Fi level and worker threads (patch/pcnet.c)
         elif name == 'get_wifisignal':
             ret = self.wifi; self.calls.append(('get_wifisignal',))
+        elif name == 'mclLoadExLyric':   # stock: the playing track's lyrics read again (patch/onlineart.c after Save Lyrics)
+            self.calls.append(('mclLoadExLyric',))
         elif name == 'reset_poweroptions_timer':   # stock: standby / auto power-off / screen countdowns set again for a non-zero argument (patch/podcasts.c keeps the device awake with (1, 1, 0))
             self.calls.append(('reset_poweroptions_timer', a0, a1, a2))
         elif name == 'lseek':   # a descriptor's position (the downloads ask the size of a .part file with SEEK_END)
