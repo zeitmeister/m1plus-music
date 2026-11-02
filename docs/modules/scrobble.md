@@ -98,6 +98,8 @@ leave the queue.
 ## Validation limits
 
 The emulator covers the play rules, the queue, the request (its signature checked against
-Python's MD5 at many lengths), the answers and the back-off. Not yet seen on the device: the
-status bar tick with the screen off during playback, the clock and time zone of the
-timestamps, Last.fm's answers to real requests. Device check EXTRA-07.
+Python's MD5 at many lengths), the answers and the back-off. Device finding (V2.1zREKRAAAE):
+plays reach last.fm with Wi-Fi on, plays made offline arrive once Wi-Fi is up, and the status
+bar tick keeps scrobbling with the screen off. Not yet checked on the device: the timestamps
+against the player's time zone, a skipped track and a podcast episode staying out. Device
+check EXTRA-07.

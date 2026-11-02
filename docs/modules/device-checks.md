@@ -65,7 +65,8 @@ in [history](../history.md); feature modules retain their detailed edge cases.
 - **EXTRA-07:** Last.fm scrobbling after `make lastfm`: a track played past half (or 4 min) shows on
   last.fm within a minute with Wi-Fi on, with the right time; plays made with Wi-Fi off arrive
   once it is on; the screen off for a whole album still scrobbles every track; a skipped track
-  and a podcast episode do not. [Scrobbling](scrobble.md)
+  and a podcast episode do not. Passed on V2.1zREKRAAAE for Wi-Fi on, Wi-Fi off and screen off;
+  the time, a skipped track and a podcast not yet checked. [Scrobbling](scrobble.md)
 - **EXTRA-05:** Vinyl Mode cover label, turning and stopping, arm on the groove and parked, keys,
   record tap, close and dark-screen timer behaviour. [Vinyl checklist](vinyl.md#device-checklist)
 
