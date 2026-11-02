@@ -7,6 +7,8 @@
 
 #define CURLOPT_WRITEDATA 10001
 #define CURLOPT_URL 10002
+#define CURLOPT_POSTFIELDS 10015 /* a POST with this body (not copied: it lives until the transfer ends) */
+#define CURLOPT_POSTFIELDSIZE 60 /* its length (long) */
 #define CURLOPT_RANGE 10007
 #define CURLOPT_ERRORBUFFER 10010
 #define CURLOPT_WRITEFUNCTION 20011
@@ -36,6 +38,7 @@
     45 /* an HTTP code of 400 or more fails the request (CURLE_HTTP_RETURNED_ERROR, 22) instead of handing over the error page */
 #define CURLOPT_PROTOCOLS 181
 #define CURLOPT_REDIR_PROTOCOLS 182
+#define CURLPROTO_HTTPS 2
 #define CURLPROTO_HTTP_HTTPS 3 /* CURLPROTO_HTTP | CURLPROTO_HTTPS: a redirect to file:// or ftp:// is refused */
 #define CURLINFO_EFFECTIVE_URL 0x100001
 #define CURLINFO_RESPONSE_CODE 0x200002

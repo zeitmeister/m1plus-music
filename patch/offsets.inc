@@ -1351,3 +1351,26 @@
 #define VN_FIRST_MS 50
 #define VN_COVER_MS 500           /* after a track change the /tmp cover is looked at again every VN_COVER_MS, VN_SETTLE times */
 #define VN_SETTLE 8
+
+/* Last.fm scrobbling (patch/scrobble.c, docs/modules/scrobble.md) */
+#define REC_ALBUM_ARTIST 0x24 /* stSongInfo: the album artist, a string the record copy duplicates (0x5db63c) */
+#define ID3_ALBUM 0x404       /* playsong_id3info (the playing file's tags, get_id3info): album, artist, title after the path at +0 */
+#define ID3_ARTIST 0x504
+#define ID3_TITLE 0x684
+#define LF_MIN_LEN 30         /* Last.fm's rules: a track of at least 30 s, played for half its length or 4 minutes */
+#define LF_MAX_WAIT 240
+#define LF_RESTART 5          /* the position back within the first 5 s (from further on): the track plays again */
+#define LF_FIELDS 6           /* a queue line: timestamp, length, artist, title, album, album artist */
+#define LF_FIELD 255          /* bytes kept of a tag */
+#define LF_LINE 1100          /* a queue line at most: two numbers and four LF_FIELD tags */
+#define LF_QCAP 262144        /* the queue's bytes at most (some 1500 plays): a play beyond it is not kept */
+#define LF_BATCH 50           /* plays a request (Last.fm's limit) */
+#define LF_SNAP 65536         /* bytes of the queue a request reads */
+#define LF_ANSWER 8192        /* bytes of Last.fm's answer kept */
+#define LF_CFG_MAX 1024       /* bytes of the settings file read */
+#define LF_CFG_VAL 64         /* a key, a secret or a session at most (32 hex digits) */
+#define LF_CFG_TICKS 60       /* the settings file read again every minute (on) or looked for (off) */
+#define LF_IDLE_LOOK 30       /* seconds between looks for the Wi-Fi while plays wait */
+#define LF_RETRY_MIN 60       /* the wait after a failed send, doubling to LF_RETRY_MAX */
+#define LF_RETRY_MAX 1800
+#define LF_AUTH_WAIT 3600     /* the wait after Last.fm refused the key or the session (or a new settings file) */

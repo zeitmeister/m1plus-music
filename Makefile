@@ -6,7 +6,7 @@ VOLUME ?= /Volumes/Music
 CLANG_FORMAT ?= $(if $(LLVM_BIN),$(LLVM_BIN)/clang-format,$(or $(wildcard /opt/homebrew/opt/llvm/bin/clang-format),clang-format))
 C_SOURCES := $(shell git ls-files 'patch/*.c' 'patch/*.h')
 
-.PHONY: help setup doctor test dev preview flash check accept publish clean format format-check lint
+.PHONY: help setup doctor test dev preview flash lastfm check accept publish clean format format-check lint
 help:
 	@echo 'make setup                  Sync the uv environment (Python 3.15)'
 	@echo 'make doctor                 Check inputs, toolchain and native emulator'
@@ -14,6 +14,7 @@ help:
 	@echo 'make dev                    Build, test and package a fresh dev version'
 	@echo 'make preview [BUILD=latest] Preview that dev build'
 	@echo 'make flash [BUILD=latest]   Copy the tested dev package to the card'
+	@echo 'make lastfm [OFF=1]         Sign the card in to Last.fm (scrobbling), or out'
 	@echo 'make check                  Full release + restore integration check'
 	@echo 'make accept                 Integration-only golden acceptance'
 	@echo 'make publish [PUBLISH=1]    Upload the golden package as a draft GitHub release named VERSION'
@@ -34,6 +35,8 @@ preview:
 	$(RUN) tools/preview.py --build "$(BUILD)"
 flash:
 	$(RUN) tools/flash_sd.py --build "$(BUILD)" --volume "$(VOLUME)" $(if $(DRY_RUN),--dry-run)
+lastfm:
+	$(RUN) tools/lastfm_login.py --volume "$(VOLUME)" $(if $(OFF),--off)
 check: lint
 	$(RUN) tools/check.py $(if $(JOBS),--jobs "$(JOBS)")
 accept:

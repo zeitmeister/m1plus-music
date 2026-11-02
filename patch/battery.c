@@ -21,6 +21,7 @@
 #include "stock.h"
 #include "home.h"
 #include "battery.h"
+#include "scrobble.h"
 
 static struct {
     int state; /* the setting: 0 not read yet, 1 off, 2 on */
@@ -91,6 +92,7 @@ int bp_capacity(void) {
     if (access(KILL_SD, F_OK) != 0) {
         if (bp.state == 0) bp.state = bp_read_setting() ? 2 : 1;
         if (bp.state == 2) pct = bp_gauge();
+        lf_tick(); /* Last.fm scrobbling (patch/scrobble.c): this tick runs on every page, the screen off too */
     }
     if (pct < 0 && !bp.shown) return cap; /* off and nothing to hide: stock, no lookups */
     if (pct >= 0) {
