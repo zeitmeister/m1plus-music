@@ -6,6 +6,7 @@ previews from one finished tree. Approximate, not AWTK; sample data.
   M1+ Music menu as Home (no top bar), Settings page, Shuffle page       preview_icons.pod_page (the tree's own ui files)
   artist Cover Flow, and the landscape Cover Flow (480 x 320, as the user sees it)   preview_cover
   Albums: the grid and the list mode of ui/m1plus_albums.bin, with the mode toggle    preview_icons.albums_grid / albums_list
+  Albums: the random album card over the grid                                       preview_icons.albums_random
   lock screen over the default wallpaper, unified battery (playing, idle + charging)   preview_lockscreen
   pull-down (the tree's dropdown_dialog.bin, real captions) and the toggle / slider art   controls()
   status bar / lock screen battery at 8x         preview_battery
@@ -329,6 +330,8 @@ def main():
             ('Artist Cover Flow', panel(cf, 2, 3)),
             ('Albums: grid view (toggle shows the list)', PI.albums_grid(s).convert('RGB')),
             ('Albums: list mode (toggle shows the grid; row 2 pressed)', PI.albums_list(s).convert('RGB')),
+            ('Albums: the dice dealt a random album (tap the card to open it, the dim to close)', PI.albums_random(s, album=0).convert('RGB')),
+            ('Albums: a long title and artist cut on the card; the card held down', PI.albums_random(s, album=3, pressed=True).convert('RGB')),
             ('Playlists: a 2x2 mosaic of each playlist\'s albums (4, 2, 3, 1, 0 and 7 albums)', PI.playlists_grid(s).convert('RGB')),
             ('Playlists: the "..." menu (New, Import, Export, Delete)', PI.playlists_grid(s, menu=True).convert('RGB')),
             ('Playlists: list mode (toggle shows the grid; row 2 pressed)', PI.playlists_grid(s, list_mode=True).convert('RGB')),

@@ -367,11 +367,16 @@ def layout_tests(ctx):
     cfb = tree.find('btn_coverflow')
     expect(cfb is not None and (cfb.x, cfb.y, cfb.w, cfb.h) == (O['NAV_CF_X'], 0, O['NAV_CF_W'], O['NAV_H'])
            and (O['NAV_CF_X'], O['NAV_CF_W']) == (pod_ui.NAV_CF_X, pod_ui.NAV_CF_W) and cfb.x + cfb.w == btn.x == 168 + 46
-           and cfb.get('style') == btn.get('style') == 'img_btn_style' and cfb.get('style:normal:icon') == 'pod_nav_coverflow'
-           and cfb.get('style:pressed:icon') == 'pod_nav_coverflow_down', 'the Cover Flow button sits flush left of the toggle (x 168, 46x50), same style, carousel glyph')
-    expect(lbl.x + lbl.w == O['NAV_CF_X'] == 168, 'the title ends where the Cover Flow button begins')
-    expect(not [w for w in tree.walk() if w is not cfb and w.name != 'navigationbar_view' and w.type == 'button'
-                and w.x < cfb.x + cfb.w and cfb.x < w.x + w.w], 'no navbar button overlaps the Cover Flow button')
+           and cfb.get('style') == btn.get('style') == 'img_btn_style' and cfb.get('style:normal:icon') == 'pod_nav_coverflowmid'
+           and cfb.get('style:pressed:icon') == 'pod_nav_coverflowmid_down', 'the Cover Flow button sits flush left of the toggle (x 168, 46x50), same style, carousel glyph (the capsule\'s middle piece)')
+    rnd = tree.find('btn_random')
+    expect(rnd is not None and (rnd.x, rnd.y, rnd.w, rnd.h) == (O['NAV_RAND_X'], 0, O['NAV_RAND_W'], O['NAV_H']) == (pod_ui.NAV_RAND_X, 0, pod_ui.NAV_RAND_W, O['NAV_H'])
+           and rnd.x + rnd.w == cfb.x == 168 and rnd.get('style') == 'img_btn_style' and rnd.get('style:normal:icon') == 'pod_nav_random'
+           and rnd.get('style:pressed:icon') == 'pod_nav_random_down', 'the dice sits flush left of Cover Flow (x 122, 46x50), the capsule\'s left cap')
+    expect(lbl.x + lbl.w == O['NAV_RAND_X'] == 122, 'the title ends where the dice begins')
+    for b in (cfb, rnd):
+        expect(not [w for w in tree.walk() if w is not b and w.name != 'navigationbar_view' and w.type == 'button' and w.y < O['NAV_H']
+                    and w.x < b.x + b.w and b.x < w.x + w.w], f'no navbar button overlaps {b.name}')
     #     list mode: the two hidden text-style labels, the geometry the rows share with the library rows
     for nm, px, col in (('label_row_title', 21, '#FFFFFF'), ('label_row_sub', 18, '#AAAAAA')):
         w = tree.find(nm)
@@ -1514,7 +1519,174 @@ def foreground_loader_tests(ctx):
     expect(not any(c[0] == 'navigator_to_with_context' for c in calls), 'fallback background abort clears the pending press')
     expect(any(c[0] == 'widget_load_image' for c in tick(m)), 'fallback background leaves loader active')
 
-SECTIONS = [layout_tests, taps_list_tests, toggle_tests, stock_widget_tests, background_build_tests, foreground_loader_tests]   # tools/check.py runs each as its own task
+RANDOM_WIDGETS = ('btn_random', 'ra_scrim', 'ra_card', 'ra_title', 'ra_sub', 'label_title')
+
+
+def random_machine(n=30, cls=None, **world):
+    """albums_machine with the random album's widgets (and the navbar title); cls: a Machine subclass (ListMachine measures text)."""
+    m = albums_machine(n, **world) if cls is None else None
+    if m is None:
+        m = cls(); albums_world(m, n, **world)
+    for w in RANDOM_WIDGETS:
+        if w not in m.widgets: m.widget(w)
+    return m
+
+
+def click(m, name):
+    """The widget's EVT_CLICK handler, as a tap on it: the calls it made."""
+    fn, ctx = m.bound[(m.widgets[name], O['EVT_CLICK'])]
+    m.calls = []
+    m.call(fn, a0=ctx, a1=0, count=40000000)
+    return list(m.calls)
+
+
+def card_up(m):
+    """(scrim, card) shown and sensitive."""
+    return tuple(m.props.get((m.widgets[w], 'visible')) == 1 and m.props.get((m.widgets[w], 'sensitive')) == 1 for w in ('ra_scrim', 'ra_card'))
+
+
+def card_down(m):
+    return all(m.props.get((m.widgets[w], 'visible'), 0) == 0 and m.props.get((m.widgets[w], 'sensitive'), 0) == 0 for w in ('ra_scrim', 'ra_card'))
+
+
+def dealt(calls, m):
+    """The card's texts set by a deal: (album, artist)."""
+    t = {c[1]: c[2] for c in calls if c[0] == 'widget_set_text_utf8'}
+    return t.get(m.widgets['ra_title']), t.get(m.widgets['ra_sub'])
+
+
+def paint_card(m):
+    ev = m.alloc(0x40); m.u.mem_write(ev, bytes(0x40)); m.setword(ev + O['EVENT_PAINT_CANVAS'], m.canvas)
+    m.blits.clear()
+    m.call(PSYMS['ra_on_paint'], a0=0, a1=ev, count=4000000)
+    return list(m.blits)
+
+
+def random_tests(ctx):
+    """17: the random album: the asset (dice, dim over the list only, card), a deal (the card's texts and cover), dealing again in place, the dim and the
+    navbar's other buttons closing the card, a tap on the card opening that album, the empty library, the title fit, hit tests."""
+    expect = ctx.expect
+    asset = os.path.join(WORK, 'rootfs', 'release/assets/default/raw/ui/m1plus_albums.bin')
+    tree = awtk_ui.parse(open(asset, 'rb').read())
+    # the asset: the dim from under the navbar to the bottom, the card centred on the list; everything hidden and insensitive; the card's labels insensitive
+    scrim, card = tree.find('ra_scrim'), tree.find('ra_card')
+    expect(scrim is not None and scrim.type == 'button' and (scrim.x, scrim.y, scrim.w, scrim.h) == (0, O['NAV_H'], 320, VIEW_H)
+           and scrim.get('visible') == 'false' and scrim.get('sensitive') == 'false' and scrim.get('style:normal:bg_color') == '#00000082',
+           'the dim is a hidden, insensitive button over the list only (0, 50, 320 x 400), the Playlists menu\'s #00000082')
+    expect(card is not None and card.type == 'button' and (card.x, card.y, card.w, card.h) == (O['RA_X'], O['RA_Y'], O['RA_W'], O['RA_H'])
+           and card.x * 2 + card.w == 320 and (card.y - O['NAV_H']) * 2 + card.h == VIEW_H and O['RA_W'] == 2 * O['RA_PAD'] + O['RA_ART'] and O['RA_ART'] == ART
+           and card.get('visible') == 'false' and card.get('sensitive') == 'false',
+           f'the card is {O["RA_W"]} x {O["RA_H"]}, centred on the list, hidden and insensitive; the cover is the cache file\'s own {ART} px')
+    expect(card.get('style:normal:bg_image') == 'ra_glass' and card.get('style:pressed:bg_image') == 'ra_glass_down' and card.get('style:normal:bg_image_draw_type') == 'patch3_x',
+           'its glass is ra_glass (pressed ra_glass_down), drawn patch3_x')
+    kids = {c.name: c for c in card.children}
+    expect(sorted(kids) == ['ra_sub', 'ra_title'] and all(k.type == 'hscroll_label' and k.get('sensitive') == 'false' and k.get('ellipses') == 'true'
+                                                          and (k.x, k.w) == (O['RA_PAD'], O['RA_ART']) for k in kids.values())
+           and (kids['ra_title'].y, kids['ra_title'].h, kids['ra_sub'].y, kids['ra_sub'].h) == (O['RA_TITLE_Y'], O['RA_TITLE_H'], O['RA_SUB_Y'], O['RA_SUB_H'])
+           and kids['ra_title'].y >= O['RA_PAD'] + O['RA_ART'] and kids['ra_sub'].y + kids['ra_sub'].h <= O['RA_H'],
+           'the album and the artist: insensitive hscroll_labels with an ellipsis, as wide as the cover, under it, inside the card')
+    root_kids = [c.name for c in tree.children]
+    expect(root_kids[-2:] == ['ra_scrim', 'ra_card'], f'the dim and the card are the window\'s last children: above the list ({root_kids[-3:]})')
+
+    # hit tests on the page: card down, the list; card up, the dim takes the list, the card its rectangle, the navbar stays live (the dice above all)
+    m = random_machine(30); open_grid(m)
+    for x, y, want in ((160, 200, 'view_grid'), (O['NAV_RAND_X'] + 20, 25, 'btn_random'), (O['NAV_RAND_X'], 25, 'btn_random'), (O['NAV_CF_X'] - 1, 25, 'btn_random'),
+                       (O['NAV_CF_X'], 25, 'btn_coverflow')):
+        got = stock_target(m, asset_tree(asset), x, y)
+        expect(got[-1] == want, f'card down: a touch at ({x},{y}) goes to {want} ({got})')
+    root = asset_tree(asset)
+    for nm in ('ra_scrim', 'ra_card'):
+        node(root, nm).flags |= F_SENSITIVE | F_VISIBLE
+    for x, y, want in ((160, 60, 'ra_scrim'), (20, 300, 'ra_scrim'), (160, 449, 'ra_scrim'), (O['RA_X'] + 10, O['RA_Y'] + 10, 'ra_card'),
+                       (160, O['RA_Y'] + O['RA_TITLE_Y'] + 5, 'ra_card'), (O['RA_X'] - 1, 200, 'ra_scrim'), (O['NAV_RAND_X'] + 20, 25, 'btn_random'),
+                       (40, 25, 'btn_return'), (O['NAV_CF_X'] + 20, 25, 'btn_coverflow'), (O['NAV_VIEW_X'] + 20, 25, 'btn_albumview'), (290, 25, 'btn_backtoplayer')):
+        got = stock_target(m, root, x, y)
+        expect(got[-1] == want, f'card up: a touch at ({x},{y}) goes to {want} ({got})')
+
+    # a deal: the card shows an album of the library, its texts, its cover decoded once (in the tap), and the dim
+    m = random_machine(30); calls = open_grid(m)
+    binds = {c[1]: c[3] for c in calls if c[0] == 'widget_on' and c[2] == O['EVT_CLICK']}
+    expect(binds.get(m.widgets['btn_random']) == PSYMS['ra_on_dice'] and binds.get(m.widgets['ra_scrim']) == PSYMS['ra_on_scrim']
+           and binds.get(m.widgets['ra_card']) == PSYMS['ra_on_card'] and binds.get(m.widgets['btn_return']) == PSYMS['al_on_back']
+           and binds.get(m.widgets['btn_backtoplayer']) == PSYMS['al_on_player'], 'the dice, the dim, the card, Back and Now Playing are bound')
+    expect(any(c[0] == 'widget_on' and c[1] == m.widgets['ra_card'] and c[2] == O['EVT_AFTER_PAINT'] and c[3] == PSYMS['ra_on_paint'] for c in calls),
+           'the card paints its cover in its own EVT_AFTER_PAINT')
+    expect(card_down(m) or not any(c[1] in (m.widgets['ra_scrim'], m.widgets['ra_card']) for c in calls if c[0] == 'widget_set_visible'),
+           'the card is not shown at open')
+    expect(paint_card(m) == [], 'a card that was never dealt paints nothing')
+    seen = set()
+    opened_ev = ('window_open', 'window_close', 'navigator_back', 'navigator_to_with_context')
+    for i in range(12):
+        loads0 = len(m.loads)
+        calls = click(m, 'btn_random')
+        album, artist = dealt(calls, m)
+        k = int(album.split()[1]) if album else -1
+        seen.add(k)
+        expect(0 <= k < 30 and artist == f'Artist {k}', f'deal {i}: the card shows an album of the library with its artist ({album!r}, {artist!r})')
+        expect(card_up(m) == (True, True), f'deal {i}: the dim and the card are shown and sensitive')
+        expect(not [c for c in calls if c[0] in opened_ev], f'deal {i}: no window opens or closes')
+        new = [u for u in m.loads[loads0:] if u != 'p_default' or i]   # the first deal also makes the placeholder disc
+        expect(len(new) == 1 and new[0] == 'file://' + art_file(fnv(fnv(O['FNV_SEED'], f'Artist {k}'), f'Album {k}') or 1),
+               f'deal {i}: one decode, the album\'s cache file ({new})')
+        blits = paint_card(m)
+        expect(len(blits) == 1 and blits[0][2] == (O['RA_PAD'], O['RA_PAD'], ART, ART) and m.bitmaps[blits[0][0]][1:] == (ART, ART),
+               f'deal {i}: the card paints the {ART} px cover at ({O["RA_PAD"]}, {O["RA_PAD"]}) ({blits})')
+        expect(('widget_invalidate_force', m.widgets['ra_card']) in calls, f'deal {i}: the card is redrawn')
+    expect(len(seen) > 1, f'twelve deals are not all the same album ({sorted(seen)})')
+    expect(len(m.bitmaps) <= TILES + 1 + 2, f'the card holds one cover and its placeholder: no leak over twelve deals ({len(m.bitmaps)} bitmaps)')
+    # the card opens the album dealt last (the stock row, as a tap on its cover), closing first
+    calls = click(m, 'ra_card')
+    expect(('navigator_to_with_context', 'albuminfo_page', O['CLASS_ALBUMS'], k) in calls and card_down(m),
+           f'a tap on the card closes it and opens album {k} as a tap on its cover does ({[c for c in calls if c[0] == "navigator_to_with_context"]})')
+    calls = click(m, 'ra_card')
+    expect(not [c for c in calls if c[0] in opened_ev], 'a second (late) tap on the closed card opens nothing')
+    # the dim closes the card, nothing else
+    click(m, 'btn_random')
+    calls = click(m, 'ra_scrim')
+    expect(card_down(m) and not [c for c in calls if c[0] in opened_ev], 'a tap on the dim closes the card and opens nothing')
+    # an album without a cover: the placeholder disc
+    m = random_machine(1, cached=False); open_grid(m)
+    album, _ = dealt(click(m, 'btn_random'), m)
+    blits = paint_card(m)
+    expect(album == 'Album 0' and len(blits) == 1 and m.bitmaps[blits[0][0]][1:] == (ART, ART) and 'p_default' in m.loads,
+           'with no cache file the card shows the placeholder disc at the cover\'s size')
+    # the other navbar buttons close the card, then do what they do
+    for name, want in (('btn_albumview', None), ('btn_coverflow', ('window_open', 'm1plus_cover')), ('btn_return', ('navigator_back',))):
+        m = random_machine(30)
+        for w in COVER_WIDGETS:
+            if w not in m.widgets: m.widget(w)
+        open_grid(m); click(m, 'btn_random')
+        calls = click(m, name)
+        expect(card_down(m) and (want is None or want in calls or want in [c[:1] for c in calls]), f'{name} closes the card first, then acts ({[c for c in calls if c[0] in opened_ev]})')
+    m = random_machine(30); open_grid(m); click(m, 'btn_random')
+    bg = [k for k in m.bound if k[1] == O['EVT_WINDOW_TO_BG']]
+    expect(len(bg) == 1, 'the page listens for going to the background')
+    fn, c_ = m.bound[bg[0]]; m.call(fn, a0=c_, a1=0, count=4000000)
+    expect(card_down(m), 'the page going to the background closes the card')
+    # the empty library: no dice
+    m = random_machine(0); calls = open_grid(m)
+    expect(('widget_set_visible', m.widgets['btn_random'], 0) in calls and ('widget_set_sensitive', m.widgets['btn_random'], 0) in calls,
+           'with an empty library the dice is hidden and insensitive')
+    calls = click(m, 'btn_random')
+    expect(not card_up(m)[0] and not dealt(calls, m)[0], 'and a stray deal shows nothing')
+    # after the page closed: nothing
+    m = random_machine(3); open_grid(m); m.call(PSYMS['al_on_destroy'], count=4000000)
+    calls = click(m, 'btn_random')
+    expect(not [c for c in calls if c[0] in ('widget_set_visible', 'widget_set_text_utf8', 'bitmap_create_ex')], 'a late deal after the page closed does nothing')
+
+    # the title: shown where "Albums" fits the room before the dice, hidden where it does not (as the Songs page)
+    lt = tree.find('label_title')
+    for width, hidden_ in ((lt.w, False), (lt.w + 1, True)):
+        m = random_machine(3, cls=ListMachine)
+        m.setword(m.widgets['label_title'] + O['W_W'], lt.w)
+        m.wtext[m.widgets['label_title']] = 'Albums'
+        m.measure = lambda t, w=width: w
+        calls = open_grid(m)
+        hid = ('widget_set_visible', m.widgets['label_title'], 0) in calls
+        expect(hid == hidden_, f'a title {width} px wide in its {lt.w} px room is {"hidden" if hidden_ else "shown"}')
+
+
+SECTIONS = [layout_tests, taps_list_tests, toggle_tests, stock_widget_tests, background_build_tests, foreground_loader_tests, random_tests]   # tools/check.py runs each as its own task
 
 
 def run(ctx):

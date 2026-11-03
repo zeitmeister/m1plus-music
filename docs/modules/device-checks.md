@@ -20,7 +20,9 @@ in [history](../history.md); feature modules retain their detailed edge cases.
 
 - **ALB-01 — Albums:** switch grid/list in place, retain the first visible album and mode after
   reboot, and return from an album to the same position. Check long labels, missing covers,
-  pressed rows, sharp tiles and a large library. [Details](albums.md)
+  pressed rows, sharp tiles and a large library. The dice shows a card (glass, sharp 168 px cover, centred
+  texts); dice again swaps it in place, the dim closes it, the card opens that album and Back returns to
+  Albums. [Details](albums.md)
 - **CF-01 — Cover Flow:** portrait/landscape, artist scope, ends, drag/fling/snap, side/centre
   taps, first cache build, cancel and rebuild. The navbar stays usable. [Details](coverflow.md)
 - **SONG-01 — Songs:** title collapse, pinned letters, all rail sections/bubble, search, each

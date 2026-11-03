@@ -254,16 +254,18 @@ def save_compact(im, path, colors=128):
     im.convert('RGB').quantize(colors, Image.Quantize.MEDIANCUT).save(path, optimize=True)
 
 def albums_navbar(s, im, to):
-    """The Albums page's navbar (Back, title, Now Playing) with the mode toggle, flush left of Now Playing (NAV_VIEW_X),
-    showing the glyph of the mode it switches to."""
-    o = offsets()
-    s.text(im, 36, 25, 'Albums', title_px(s.tree))
-    im.alpha_composite(s.img('return'), (14, 14))
-    im.alpha_composite(s.img('back_to_player'), (278, 13))
-    c = s.img('pod_nav_coverflow')   # the Cover Flow button, flush left of the toggle
-    im.alpha_composite(c, (o['NAV_CF_X'] + (o['NAV_CF_W'] - c.width) // 2, (o['NAV_H'] - c.height) // 2))
-    n = 'pod_nav_' + to
-    im.alpha_composite(s.img(n), (o['NAV_VIEW_X'] + (o['NAV_VIEW_W'] - s.img(n).width) // 2, (o['NAV_H'] - s.img(n).height) // 2))
+    """The Albums page's glass navbar as the built asset has it: Back, the title (hidden by the payload where it is wider than its room), and the
+    capsule [dice | Cover Flow | toggle (the glyph of the mode it switches to) | Now Playing]."""
+    import awtk_ui, preview_songs as PS
+    root = awtk_ui.parse(open(os.path.join(s.tree, RAW, 'ui', 'm1plus_albums.bin'), 'rb').read())
+    lbl, px = root.find('label_title'), title_px(s.tree)
+    word = s.shown(lbl)
+    if s.font.width(word, px) <= lbl.w: s.text(im, lbl.x, 25, word, px)
+    PS.glass(s, im, 'ah_nav_back', 7, 44)
+    for name in ('btn_random', 'btn_coverflow', 'btn_albumview', 'btn_backtoplayer'):
+        b = root.find(name)
+        icon = 'pod_nav_' + to if name == 'btn_albumview' else b.get('style:normal:icon')
+        PS.glass(s, im, icon, b.x, b.w)
 
 def rounded(c, r, k=4):
     """Cover image c with r px rounded corners (drawn k times larger and reduced), as patch/grid.c rounds the Albums covers."""
@@ -295,6 +297,30 @@ def albums_grid(s, scroll=0):
             s.text(im, x, ty + th / 2, cut(title, 18), 18)
         if ty + th >= 50 and ty + th + sh <= H_:
             s.text(im, x, ty + th + sh / 2, cut(artist, 15), 15, (0xAA, 0xAA, 0xAA))
+    return im
+
+def albums_random(s, album=3, pressed=False):
+    """The Albums grid with the random album card up (patch/albums.c ra_*): the dim over the list only (the navbar stays bright and live), the card's glass
+    (ra_glass, or ra_glass_down held down) stretched to RA_W as patch3_x does, the RA_ART cover with RA_ART_R corners, the album (20 px white) and the artist
+    (16 px #AAAAAA), centred and cut with an ellipsis at the cover's width. album: an index into ALBUMS."""
+    import awtk_ui
+    o = offsets()
+    root = awtk_ui.parse(open(os.path.join(s.tree, RAW, 'ui', 'm1plus_albums.bin'), 'rb').read())
+    im = albums_grid(s)
+    sc, card = root.find('ra_scrim'), root.find('ra_card')
+    im.alpha_composite(Image.new('RGBA', (sc.w, sc.h), card_rgba(sc.get('style:normal:bg_color'))), (sc.x, sc.y))
+    g = s.img('ra_glass_down' if pressed else 'ra_glass'); t = g.width // 3
+    glass = Image.new('RGBA', (card.w, g.height))
+    glass.paste(g.crop((0, 0, t, g.height)), (0, 0)); glass.paste(g.crop((g.width - t, 0, g.width, g.height)), (card.w - t, 0))
+    glass.paste(g.crop((t, 0, g.width - t, g.height)).resize((card.w - 2 * t, g.height)), (t, 0))
+    im.alpha_composite(glass, (card.x, card.y))
+    title, artist, rgb = ALBUMS[album]
+    im.alpha_composite(rounded(sample_cover(rgb, o['RA_ART']), o['RA_ART_R']), (card.x + o['RA_PAD'], card.y + o['RA_PAD']))
+    for lab, text in ((root.find('ra_title'), title), (root.find('ra_sub'), artist)):
+        px, rgb_ = int(lab.get('style:normal:font_size')), card_rgba(lab.get('style:normal:text_color'))[:3]
+        while s.font.width(text, px) > lab.w and len(text) > 1:      # the hscroll_label's ellipsis
+            text = text[:-2] + '…' if text.endswith('…') else text[:-1] + '…'
+        s.text(im, card.x + lab.x + (lab.w - s.font.width(text, px)) / 2, card.y + lab.y + lab.h / 2, text, px, rgb_)
     return im
 
 PLAYLISTS = [('Road Trip', 12, (0, 1, 2, 3)), ('Late Night', 31, (4, 6)), ('日本語のプレイリスト', 8, (10, 6, 7)), ('Focus', 40, (8,)),

@@ -59,6 +59,10 @@ TOGGLE_NAME = {'list': 'btn_albumview', 'grid': 'btn_albumview', 'artist': 'btn_
 NAV_CF_W = NAV_VIEW_W
 NAV_CF_X = NAV_VIEW_X - NAV_CF_W     # 168; patch/offsets.inc NAV_CF_X, NAV_CF_W
 NAV_CF_ICON = 'pod_nav_coverflow'
+# The Albums page's random album button, flush left of Cover Flow: the capsule's left cap, Cover Flow then its middle piece.
+NAV_RAND_W = NAV_CF_W
+NAV_RAND_X = NAV_CF_X - NAV_RAND_W   # 122; patch/offsets.inc NAV_RAND_X, NAV_RAND_W
+NAV_RAND_ICON, NAV_CF_MID_ICON = 'pod_nav_random', 'pod_nav_coverflowmid'
 NAV_BACK_X, NAV_BACK_W = 7, 44       # Back: the glass disc ah_nav_back (42 px) centred in a 44 x 50 button: x 8 .. 50, y 4 .. 46 (img_btn_style, so the shared navbar_btnreturn_style and the stock pages are untouched)
 NAV_TITLE_X = 58                     # the title starts 8 px after the disc
 NAV_PLAY_X, NAV_PLAY_W = 260, 60     # Now Playing: main's button; its image is the disc ah_nav_np alone (glyph centre 290) or a capsule's right cap ah_nav_play (same glyph, the glass ends at x 311)
@@ -85,10 +89,10 @@ NAV_SEARCH_X = SONGS_BUTTONS[0][2]
 NAV_SETTINGS_ICON = 'pod_nav_settings'   # the Extras page's Settings button: the capsule's left cap on the 214 slot (tools/mod_icons.py)
 
 
-def navbar(title, toggle=None, coverflow=False, artist_songs=False, more=False, songs=False, settings=False, select=False, show_more=False, show_globe=False):
+def navbar(title, toggle=None, coverflow=False, artist_songs=False, more=False, songs=False, settings=False, select=False, show_more=False, show_globe=False, random=False):
     nb = Widget('view', 0, 0, SCREEN_W, NAVBAR_H, [('name', 'navigationbar_view')])
     # a title runs under a toggle's button no further than the button's left edge
-    right = NAV_SEARCH_X if songs else NAV_CF_X if coverflow or more else NAV_VIEW_X if toggle or settings or select or show_more else NAV_TITLE_END
+    right = NAV_RAND_X if random else NAV_SEARCH_X if songs else NAV_CF_X if coverflow or more else NAV_VIEW_X if toggle or settings or select or show_more else NAV_TITLE_END
     lbl = Widget('label', NAV_TITLE_X, 14, right - NAV_TITLE_X, 22,
                  [('name', 'label_title'), ('style', 'navbar_label_white'), ('length', '31'), pod_i18n.text_prop(title)])
     ret = Widget('button', NAV_BACK_X, 0, NAV_BACK_W, NAVBAR_H, [
@@ -121,9 +125,14 @@ def navbar(title, toggle=None, coverflow=False, artist_songs=False, more=False, 
             ('name', 'btn_globe'), ('enable', 'true'), ('style', 'img_btn_style'),
             ('style:pressed:icon', 'pod_nav_globe_down'), ('style:normal:icon', 'pod_nav_globe'), ('style:over:icon', 'pod_nav_globe')])))
     if coverflow:
+        cf = NAV_CF_MID_ICON if random else NAV_CF_ICON
         nb.children.append(Widget('button', NAV_CF_X, 0, NAV_CF_W, NAVBAR_H, [
             ('name', 'btn_coverflow'), ('enable', 'true'), ('style', 'img_btn_style'),
-            ('style:pressed:icon', NAV_CF_ICON + '_down'), ('style:normal:icon', NAV_CF_ICON), ('style:over:icon', NAV_CF_ICON)]))
+            ('style:pressed:icon', cf + '_down'), ('style:normal:icon', cf), ('style:over:icon', cf)]))
+    if random:   # the Albums page's random album (patch/albums.c): the capsule's left cap; the payload hides it with an empty library
+        nb.children.append(Widget('button', NAV_RAND_X, 0, NAV_RAND_W, NAVBAR_H, [
+            ('name', 'btn_random'), ('enable', 'true'), ('style', 'img_btn_style'),
+            ('style:pressed:icon', NAV_RAND_ICON + '_down'), ('style:normal:icon', NAV_RAND_ICON), ('style:over:icon', NAV_RAND_ICON)]))
     if more:   # the Playlists page's "..." menu button, in the Cover Flow button's place
         nb.children.append(Widget('button', NAV_CF_X, 0, NAV_CF_W, NAVBAR_H, [
             ('name', 'btn_more'), ('enable', 'true'), ('style', 'img_btn_style'),
@@ -316,10 +325,10 @@ GRID_ALBUM_PX, GRID_ARTIST_PX = 18, 15   # the grid's album / artist text under 
 LIST_TITLE_PX, LIST_SUB_PX = 21, 18   # the list mode's album / artist text (the library rows': 21 px white, 18 px #AAAAAA)
 
 
-def build_grid_page(page, toggle='list', coverflow=True, names=('albums_listview', 'albums_scrollview'), more=False):
+def build_grid_page(page, toggle='list', coverflow=True, names=('albums_listview', 'albums_scrollview'), more=False, random=False):
     root = Widget('window', 0, 0, 0, 0, [('name', page.name)])
     styled(root, ('normal', 'disable', 'focused'), 'bg_color', '#000000')
-    root.children.append(navbar(page.title, toggle=toggle, coverflow=coverflow, more=more))
+    root.children.append(navbar(page.title, toggle=toggle, coverflow=coverflow, more=more, random=random))
     lv = stock_list([], True)   # the library lists' structure: list_view > scroll_view 310 wide + scroll_bar_m. The mobile bar is not decoration: the list_view layouter makes the scroll_view yslidable only for it (0x60b1c8), scroll_view_create leaves it 0
     lv.set('name', names[0])
     sv = lv.children[0]
@@ -340,7 +349,39 @@ def build_grid_page(page, toggle='list', coverflow=True, names=('albums_listview
         lab = hidden(label(name, 0, 0, 10, 10, '', px, colour, 'left'))
         styled(lab, ('normal',), 'text_align_v', 'middle')
         root.children.append(lab)
+    if random: root.children.extend(random_card())   # last: above the list
     return root
+
+
+# The Albums page's random album (patch/albums.c, docs/modules/albums.md): a dim over the list only (from y NAV_H: the navbar stays above it and live, so the
+# dice deals again with the card up; a tap on the dim closes it) and the card centred on the list, in the sort card's glass (ra_glass, patch3_x; pressed
+# ra_glass_down): the payload paints the cover in the card's EVT_AFTER_PAINT; the album and the artist are two insensitive hscroll_labels, centred, cut with
+# an ellipsis. A tap on the card opens the album. All of it starts hidden and insensitive.
+RA_TITLE_PX, RA_SUB_PX = 20, 16
+
+
+def random_card():
+    o = OFFSETS
+    scrim = hidden(Widget('button', 0, NAVBAR_H, SCREEN_W, CLIENT_H - NAVBAR_H, [('name', 'ra_scrim'), ('enable', 'true')]))
+    for st in STATES:
+        styled(scrim, (st,), 'bg_color', PL_DIM)
+        styled(scrim, (st,), 'border_width', '0')
+        styled(scrim, (st,), 'border_color', '#00000000')
+    card = hidden(Widget('button', o['RA_X'], o['RA_Y'], o['RA_W'], o['RA_H'], [('name', 'ra_card'), ('enable', 'true')]))
+    for st in STATES:
+        styled(card, (st,), 'bg_color', '#00000000')
+        styled(card, (st,), 'bg_image', 'ra_glass_down' if st == 'pressed' else 'ra_glass')
+        styled(card, (st,), 'bg_image_draw_type', 'patch3_x')
+        styled(card, (st,), 'border_width', '0')
+    for name, y, h, px, colour in (('ra_title', o['RA_TITLE_Y'], o['RA_TITLE_H'], RA_TITLE_PX, '#FFFFFF'), ('ra_sub', o['RA_SUB_Y'], o['RA_SUB_H'], RA_SUB_PX, '#AAAAAA')):
+        lab = Widget('hscroll_label', o['RA_PAD'], y, o['RA_ART'], h, [('name', name), ('text', ''), ('only_parent_focus', 'true'), ('ellipses', 'true'), ('sensitive', 'false')])
+        for st in ('normal', 'disable', 'focused'):
+            styled(lab, (st,), 'font_size', str(px))
+            styled(lab, (st,), 'text_color', colour)
+            styled(lab, (st,), 'text_align_h', 'center')
+            styled(lab, (st,), 'text_align_v', 'middle')
+        card.children.append(lab)
+    return scrim, card
 
 
 # The Show page's text styles (patch/podcasts.c; hidden labels the payload reads with widget_prepare_text_style and measures with widget_measure_text): name, px, colour, alignment.
@@ -1779,7 +1820,7 @@ def build_page(page):
     if page.kind == 'covlist':
         return build_grid_page(page, toggle=None, coverflow=False, names=('covlist_listview', 'covlist_scrollview'))
     if page.kind == 'grid':
-        return build_grid_page(page)
+        return build_grid_page(page, random=True)   # Albums
     if page.kind == 'podcasts':
         return build_podcasts_page(page)
     if page.kind == 'playlists':

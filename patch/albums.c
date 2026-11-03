@@ -59,6 +59,7 @@
 #include "grid.h"
 
 extern int coverflow_open(void); /* patch/coverflow.c: the menu's Cover Flow row, opened over this page */
+extern unsigned pod_rand(unsigned n); /* patch/shuffle.c: 0 .. n - 1 (the shuffle generator, seeded once) */
 extern int pod_home_open(int id); /* patch/m1plus.c: a stock Home destination through the dispatcher */
 
 #define CELL_H GRID_CELL_H /* the cell geometry is the grid's (patch/grid.h), shared with the Recently Played shelf */
@@ -113,6 +114,15 @@ static struct {
     grid_t
         g; /* the tile ring (GRID_TILES, heap), the placeholder, the mode's cover size (g.side): patch/grid.c; LAST (test/pod/albums.py reads the fields above by index) */
 } al __attribute__((section(".scratch")));
+
+/* The random album card (see "The random album" below): its widgets, the album shown (+ 1, 0 none), and its one-tile grid (the RA_ART cover
+ * and placeholder, made at the first deal and kept until the page closes). */
+static struct {
+    void *dice, *scrim, *card, *title, *sub;
+    int pick;
+    grid_t g;
+} ra __attribute__((section(".scratch")));
+static void ra_close(void);
 
 /* Hidden and out of the hit test together (this AWTK's widget_find_target ignores visible). */
 static void al_show(void *w, int on) {
@@ -492,6 +502,7 @@ static int al_on_abort(void *ctx, void *e) {
 
 static int al_on_bg(void *ctx, void *e) {
     al_on_abort(ctx, e);
+    ra_close();
     al.fg = 0;
     if (al.more_timer) timer_remove(al.more_timer);
     al.more_timer = 0;
@@ -506,9 +517,92 @@ static int al_on_bg(void *ctx, void *e) {
 static int al_on_cover(void *ctx, void *e) {
     (void)ctx;
     (void)e;
+    ra_close();
     al_build_end(); /* one worker at a time: Cover Flow builds what is missing itself, with its Preparing screen */
     coverflow_open();
     return RET_OK;
+}
+
+/* ---------------------------------------------------------------------------
+ * The random album: the navbar's dice deals one album of the library (pod_rand: repeats are possible) onto a card over the list, the cover
+ * (the cache file at its own RA_ART size, decoded once per deal in the tap, never in paint), the album and the artist. The dim behind the card
+ * covers the list only, so the navbar stays live: the dice deals again in place, the other buttons close the card and do what they do. A tap on
+ * the dim closes the card; a tap on the card closes it and opens the album page as a tap on its cover does (Back returns to the page).
+ */
+static void ra_close(void) {
+    ra.pick = 0;
+    al_show(ra.scrim, 0);
+    al_show(ra.card, 0);
+}
+
+/* The one-tile grid of the card: the RA_ART cover with its corners cut in the alpha (it lies on the glass), and the placeholder disc. 0 without memory. */
+static int ra_grid(void) {
+    if (ra.g.tiles) return 1;
+    if (!grid_init(&ra.g, al.win, 1, RA_ART, RA_ART_R)) {
+        grid_free(&ra.g);
+        return 0;
+    }
+    grid_shape(&ra.g, RA_ART, RA_ART_R, 1);
+    grid_placeholder(&ra.g);
+    return 1;
+}
+
+static int ra_on_dice(void *ctx, void *e) {
+    grid_tile_t *t;
+    void *rec;
+    unsigned a;
+    (void)ctx;
+    (void)e;
+    if (!al.view || !al.count || !ra.card || !ra.scrim || !ra_grid()) return RET_OK;
+    a = pod_rand(al.count);
+    rec = cc_row(al.albums, al.order, a);
+    t = &ra.g.tiles[0];
+    grid_free_art(t);
+    t->ckey = cc_album_key(rec);
+    grid_art(&ra.g, t); /* the cover, else the placeholder (t->art 2) */
+    if (ra.title) widget_set_text_utf8(ra.title, cc_str(rec, REC_ALBUM));
+    if (ra.sub) widget_set_text_utf8(ra.sub, cc_str(rec, REC_ARTIST));
+    ra.pick = (int)a + 1;
+    al_show(ra.scrim, 1);
+    al_show(ra.card, 1);
+    widget_invalidate_force(ra.card, (void *)0);
+    return RET_OK;
+}
+
+/* The card's own EVT_AFTER_PAINT, in the card's coordinates: the cover over the glass (the labels are the card's children). Nothing is decoded here. */
+static int ra_on_paint(void *ctx, void *e) {
+    void *canvas = e ? *(void **)((char *)e + EVENT_PAINT_CANVAS) : (void *)0;
+    (void)ctx;
+    if (canvas && ra.pick && ra.g.tiles) grid_blit(canvas, &ra.g, &ra.g.tiles[0], RA_PAD, RA_PAD, 0);
+    return RET_OK;
+}
+
+static int ra_on_card(void *ctx, void *e) {
+    int a = ra.pick - 1;
+    (void)ctx;
+    (void)e;
+    if (a < 0 || a >= (int)al.count || !al.view) return RET_OK;
+    ra_close();
+    cc_open_album((void *)0, 0, (int)(al.order ? al.order[a] : (unsigned)a)); /* the stock row, as a tap on the cover */
+    return RET_OK;
+}
+
+static int ra_on_scrim(void *ctx, void *e) {
+    (void)ctx;
+    (void)e;
+    ra_close();
+    return RET_OK;
+}
+
+/* Back and Now Playing close the card first. */
+static int al_on_back(void *ctx, void *e) {
+    ra_close();
+    return pod_on_back(ctx, e);
+}
+
+static int al_on_player(void *ctx, void *e) {
+    ra_close();
+    return pod_on_player(ctx, e);
 }
 
 static int al_on_destroy(void *ctx, void *e) {
@@ -516,6 +610,8 @@ static int al_on_destroy(void *ctx, void *e) {
     (void)e;
     if (al.more_timer) timer_remove(al.more_timer);
     al_build_end(); /* the timer removed, the worker cancelled and joined */
+    grid_free(&ra.g);
+    memset(&ra, 0, sizeof ra);
     grid_free(&al.g);
     if (al.albums) deque_destroy(al.albums);
     free(al.order);
@@ -582,9 +678,17 @@ static int al_on_toggle(void *ctx, void *e) {
     (void)ctx;
     (void)e;
     if (!al.view) return RET_OK;
+    ra_close();
     al_set_mode(!al.list);
     home_write_atomic(ALBUMS_FILE, ALBUMS_TMP, al.list ? "0\n" : "1\n");
     return RET_OK;
+}
+
+/* The navbar's title ends at the dice (NAV_RAND_X): a language whose "Albums" is wider than that room has no title (as the Songs page). */
+static void al_title_fit(void) {
+    void *lt = widget_lookup(al.win, "label_title", 1);
+    const unsigned *t = lt ? widget_get_text(lt) : (const unsigned *)0;
+    if (t && *t && (int)(widget_measure_text(lt, t) + 0.999f) > I(lt, W_W)) al_show(lt, 0);
 }
 
 /* The page in the given mode. 0 once it is up, -1 if the window could not open, -2 if the asset is not ours (the
@@ -596,10 +700,18 @@ static int al_open(int list) {
     if (!al.win) return -1;
     al.list = list;
     widget_on(al.win, EVT_DESTROY, al_on_destroy, (void *)0);
-    pod_bind(al.win, "btn_return", pod_on_back, (void *)0);
-    pod_bind(al.win, "btn_backtoplayer", pod_on_player, (void *)0);
+    memset(&ra, 0, sizeof ra);
+    pod_bind(al.win, "btn_return", al_on_back, (void *)0);
+    pod_bind(al.win, "btn_backtoplayer", al_on_player, (void *)0);
     pod_bind(al.win, "btn_albumview", al_on_toggle, (void *)0);
     pod_bind(al.win, "btn_coverflow", al_on_cover, (void *)0);
+    ra.dice = pod_bind(al.win, "btn_random", ra_on_dice, (void *)0); /* optional, as the card */
+    ra.scrim = pod_bind(al.win, "ra_scrim", ra_on_scrim, (void *)0);
+    ra.card = pod_bind(al.win, "ra_card", ra_on_card, (void *)0);
+    ra.title = widget_lookup(al.win, "ra_title", 1);
+    ra.sub = widget_lookup(al.win, "ra_sub", 1);
+    if (ra.card) widget_on(ra.card, EVT_AFTER_PAINT, ra_on_paint, (void *)0);
+    al_title_fit();
     al.btn = widget_lookup(al.win, "btn_albumview", 1);
     al.view = widget_lookup(al.win, "view_grid", 1);
     al.sv = widget_lookup(al.win, "albums_scrollview", 1);
@@ -620,6 +732,7 @@ static int al_open(int list) {
     al.order = cc_album_order(al.albums);
     if (!al.count || !grid_init(&al.g, al.win, GRID_TILES, GRID_COVER, 0)) {
         grid_free(&al.g);
+        al_show(ra.dice, 0); /* nothing to deal */
         al_show(al.view, 0);
         al_show(al.status, 1);
         widget_set_tr_text(al.status, al.count ? "Not enough memory" : "Update Local Music first");

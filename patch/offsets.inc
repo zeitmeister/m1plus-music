@@ -410,6 +410,25 @@
 #define NAV_VIEW_W 46
 #define NAV_CF_X 168            /* the Albums page's Cover Flow button, flush left of the toggle; its title ends here */
 #define NAV_CF_W 46
+/* The Albums page's random album (patch/albums.c, docs/modules/albums.md): the dice button flush left of Cover Flow, and the card it
+ * opens: RA_W x RA_H centred in the list under the navbar, the cover (RA_ART, the cache file's own size: no scaling) RA_PAD from the
+ * top and sides with RA_ART_R corners cut in the alpha, then the album (RA_TITLE_H at RA_TITLE_Y, 20 px white) and the artist
+ * (RA_SUB_H at RA_SUB_Y, 16 px #AAAAAA), both centred and cut with an ellipsis. The dim behind it covers the list only (y NAV_H..),
+ * so the navbar, the dice above all, stays live. */
+#define NAV_RAND_X 122
+#define NAV_RAND_W 46
+#define RA_ART 168
+#define RA_ART_R 10
+#define RA_PAD 20
+#define RA_W 208                /* RA_PAD + RA_ART + RA_PAD */
+#define RA_TITLE_Y 200          /* RA_PAD + RA_ART + 12 */
+#define RA_TITLE_H 26
+#define RA_SUB_Y 226
+#define RA_SUB_H 22
+#define RA_H 266                /* RA_SUB_Y + RA_SUB_H + 18 */
+#define RA_X 56                 /* (320 - RA_W) / 2 */
+#define RA_Y 117                /* NAV_H + (GRID_VIEW_H - RA_H) / 2 */
+#define RA_R 16
 #define LIST_ROW_H 64
 #define LIST_ART 52
 #define LIST_R 4                /* the list covers' corner radius: cut in the bitmap's alpha (a pressed row's fill shows behind them; patch/grid.c blend) */

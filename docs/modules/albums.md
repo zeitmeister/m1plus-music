@@ -18,7 +18,7 @@ If the window cannot open, the Home dispatcher opens stock Albums.
 | Grid text | Album 18 px white, artist 15 px grey; one ellipsized line each |
 | List | 64 px rows, 52 px covers at (10, 4), text from x 74; title 21 px, artist 18 px |
 | Corners | Grid 8 px blended into black; list 4 px in the bitmap alpha |
-| Navbar | Back, title, Cover Flow at x 168, view toggle at x 214, Now Playing at x 260 |
+| Navbar | Back, title, dice at x 122, Cover Flow at x 168, view toggle at x 214, Now Playing at x 260 |
 | Mode file | `/mnt/data/m1plus/albums-view`: 1 grid, 0 list; otherwise `ALBUMS_DEFAULT_GRID` |
 
 The stock mobile scrollbar is required: the list-view layouter enables vertical scrolling
@@ -63,6 +63,27 @@ Destroy cancels and joins owned work, frees the set and removes timers.
 A refused timer/thread, busy worker or less than 16 MB free space leaves placeholders.
 A completed scan with no missing files is not repeated during that page's lifetime.
 
+## Random album
+
+The navbar's dice (`btn_random`, the capsule's left cap; Cover Flow is then its middle piece) deals one album with
+`pod_rand(count)` (repeats are possible) onto a card over the list. With an empty library or no memory for the grid the
+dice is hidden and insensitive.
+
+| Element | Contract |
+|---|---|
+| Dim | `ra_scrim`, (0, 50, 320 × 400), `#00000082`: the list only, so the navbar stays live |
+| Card | `ra_card`, RA_W × RA_H centred on the list, `ra_glass` drawn `patch3_x` (pressed `ra_glass_down`) |
+| Cover | RA_ART (168, the cache file's size) at RA_PAD, RA_ART_R corners cut in the alpha; no file: the placeholder disc |
+| Text | `ra_title` 20 px white, `ra_sub` 16 px `#AAAAAA`: centred hscroll_labels with an ellipsis, cover width |
+
+A deal decodes one cover in the tap (never in paint) into a one-tile grid kept until the page closes (two 113 KB
+bitmaps with the placeholder). The dice deals again in place while the card is up. A tap on the dim closes the card; a
+tap on the card closes it and opens the album through `cc_open_album`, as a tap on its cover. Back, Now Playing, Cover
+Flow, the view toggle and backgrounding close the card first.
+
+The title room ends at the dice (64 px at 20 px). Where "Albums" is wider (Japanese, Spanish, Russian, Ukrainian) the
+payload hides the title, as on the Songs page.
+
 ## Input and validation
 
 The stock scroll view owns drag, fling and end stops; [list gestures](gestures.md) handles
@@ -70,7 +91,7 @@ coasting catches. Page listeners return without consuming events. A release on t
 cell within 10 px on both axes opens the album. Drag, abort, backgrounding or a touch that
 stops coasting clears the press and opens nothing. List presses use `#333333`.
 
-Tests cover both modes, real stock layout and pointer handlers, large-library content
+Tests cover both modes, the random album (asset, hit tests with the card up and down, deals, closing paths, title fit), real stock layout and pointer handlers, large-library content
 heights, tile bounds, loader deferral, cache-worker ownership, persistence and failure paths.
 Real frame timing and canvas/text appearance require [device checks](device-checks.md).
 See [album page](album-page.md) for album opening, [Cover Flow](coverflow.md) for the shared

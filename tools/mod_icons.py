@@ -189,6 +189,8 @@ POD_UI = ['m1plus_menu', 'm1plus_shuffle', 'm1plus_extras', 'm1plus_mainmenu', '
 NAV_VIEW = {'pod_nav_grid': 'layout-grid', 'pod_nav_list': 'list',
             'pod_nav_artist': 'mic-vocal', 'pod_nav_albumartist': 'user-star',   # the Artists page's Artist / Album Artist switch
             'pod_nav_coverflow': '+coverflow',   # Lucide gallery-horizontal with shorter side covers
+            'pod_nav_coverflowmid': '+coverflow',   # the Albums page's Cover Flow: the middle piece of [Dice | Cover Flow | toggle | Now Playing]
+            'pod_nav_random': '+dice',   # the Albums page's random album (a die showing three): the capsule's left cap
             'pod_nav_more': 'ellipsis',   # the Playlists page's "..." menu button
             'pod_nav_globe': 'globe',   # the Podcasts page's Apple Podcasts search, the capsule's left cap
             'pod_nav_moremid': 'ellipsis',   # the Podcasts page's "..." as the middle piece of [Globe | ... | Now Playing]
@@ -196,9 +198,10 @@ NAV_VIEW = {'pod_nav_grid': 'layout-grid', 'pod_nav_list': 'list',
             'pod_nav_search': 'search', 'pod_nav_songsort': 'arrow-down-wide-narrow', 'pod_nav_select': 'list-checks',
             'pod_nav_selectl': 'list-checks',   # the Songs page's Search / Sort / Select (capsule: left, middle, middle, then Now Playing); selectl: Select as the left cap of a genre's songs (no Search: Select | Now Playing)
             'pod_nav_settings': 'sliders-horizontal'}   # the Extras page's Settings button: the left cap of [Settings | Now Playing]
-# the glass piece each Pod page button is (docs/modules/navbar.md): the Albums and Playlists pages' capsule is Cover Flow / "..." (left cap), the grid / list
+# the glass piece each Pod page button is (docs/modules/navbar.md): the Albums page's capsule is the dice (left cap), Cover Flow (middle), the Playlists page's "..." (left cap), the grid / list
 # toggle (middle), Now Playing (right cap); the Artists page's is the switch (left cap) and Now Playing; the Cover Flow artist page's is Songs (left cap) and Now Playing
 NAV_VIEW_POS = {'pod_nav_grid': 'middle', 'pod_nav_list': 'middle', 'pod_nav_artist': 'left', 'pod_nav_albumartist': 'left', 'pod_nav_coverflow': 'left',
+                'pod_nav_coverflowmid': 'middle', 'pod_nav_random': 'left',
                 'pod_nav_more': 'left', 'pod_nav_moremid': 'middle', 'pod_nav_globe': 'left', 'pod_nav_songs': 'left', 'pod_nav_search': 'left', 'pod_nav_songsort': 'middle', 'pod_nav_select': 'middle', 'pod_nav_selectl': 'left', 'pod_nav_settings': 'left'}
 NAV_PX = 24
 # The Playlists page's "..." menu rows (tools/pod_ui.py playlist_menu, in row order): a bare white glyph left of the label, as on Now
@@ -287,6 +290,7 @@ NP = {'np_play': ('pil:play', 44, 0, 'fg', 'np_play_down'), 'np_pause': ('pil:pa
       'pm_sheet': ('pil:glass_sheet', (320, 250), 0, 'fg', None), 'pm_sheet6': ('pil:glass_sheet6', (320, 300), 0, 'fg', None),
       'pl_glass': ('pil:glass_menu', (72, 200), 0, 'fg', None),
       'sg_glass': ('pil:glass_sort', (72, 250), 0, 'fg', None),
+      'ra_glass': ('pil:glass_rand', (72, 266), 0, 'fg', 'ra_glass_down'),   # the Albums page's random album card (GLASS_RAND)
       'np_grabber': ('pil:grabber', (120, 44), 0, 'ghost', 'np_grabber_down'),
       'np_row_playing': ('pil:wave', (40, 20), 0, 'fg', None),
       'np_random': ('shuffle', 30, 18, 'mid', None), 'np_cycle': ('repeat', 30, 18, 'mid', None),
@@ -985,7 +989,7 @@ def solid_pill(w, h, rgb):
 # cut from one pane, the straight parts of a pane being identical). Pressed: a disc is the lighter glass; a capsule slice keeps the rest glass (the
 # capsule stays one pane) with a round highlight on its glyph (NAV_PRESS_D, concentric with the cap ends: every glyph is 21 px from a cap's edge).
 GLASS_H, GLASS_GLYPH = 42, 20                # the glass is 42 px high (y 4 .. 46 in a 50 px bar), the glyph's ink box 20 px (the navbar's NAV_K size)
-NAV_SLOT_W, NAV_PLAY_W, NAV_CAPSULE_W = 46, 60, 141   # patch/offsets.inc NAV_VIEW_W; Now Playing's button; the pane of the capsule's pieces (any width: the Albums capsule is 177 .. 311, the Artists one 223 .. 311)
+NAV_SLOT_W, NAV_PLAY_W, NAV_CAPSULE_W = 46, 60, 141   # patch/offsets.inc NAV_VIEW_W; Now Playing's button; the pane of the capsule's pieces (any width: the Albums capsule is 131 .. 311, the Artists one 223 .. 311)
 NAV_PRESS_D, NAV_PRESS_ALPHA = 36, 0.14      # a pressed slice's highlight: a white disc 36 px across (3 px of glass above and below it), 14 % opaque
 
 def glass_piece(w, x0, x1, glyph, glyph_cx, pressed=False, cap=None, h=GLASS_H):
@@ -1231,7 +1235,9 @@ GLASS_SHEET6 = (320, 300, 18)                               # the same sheet wit
 GLASS_SHEET = (320, 250, 18)                                  # Now Playing's More sheet, page 2 (five rows: the back header, Speed, A-B repeat, Find Cover & Lyrics, Delete; patch/playmore.c, docs/modules/playmore.md): top corners only
 GLASS_SHEET_FILL = ((0x2A, 0x2A, 0x2C), (0x1E, 0x1E, 0x20), 0.88)   # denser than the card (0.76): rows, labels and grey badges sit straight on it (docs/modules/playmore.md)
 GLASS_SORT = (72, 250, 14)    # the Songs page's sort card (docs/modules/songs.md): the same pane, five rows high (the gradient is vertical, so each height has its own picture)
-GLASS_MENU = (72, 200, 14)    # the Playlists page's "..." menu card (patch/playlists.c, docs/modules/playlists.md): the sheet's glass, all four corners; drawn patch3_x
+GLASS_RAND = (72, 266, 16)    # the Albums page's random album card (patch/offsets.inc RA_H, RA_R; drawn patch3_x to RA_W): the sort card's pane, pressed a lighter fill
+GLASS_RAND_DOWN = ((0x3A, 0x3A, 0x3C), (0x2E, 0x2E, 0x30), 0.92)
+GLASS_MENU = (72, 200, 14)   # the Playlists page's "..." menu card (patch/playlists.c, docs/modules/playlists.md): the sheet's glass, all four corners; drawn patch3_x
                               # (the middle 24 px stretched to the card's width), as tall as the card (tools/pod_ui.py PL_CARD_H)
 GLASS_FILL = {False: ((0x2D, 0x2D, 0x2F), (0x23, 0x23, 0x25), 0.82), True: ((0x3A, 0x3A, 0x3C), (0x30, 0x30, 0x32), 0.86)}   # top rgb, bottom rgb, alpha
 GLASS_CARD_FILL = ((0x2A, 0x2A, 0x2C), (0x1E, 0x1E, 0x20), 0.76)   # the card: a little more see-through (only its 12 px frame and the text band show)
@@ -1289,6 +1295,7 @@ def np_images():
             elif g == 'pil:glass_sheet6': out[name] = glass_image(*GLASS_SHEET6, fill=GLASS_SHEET_FILL, top_only=True)
             elif g == 'pil:glass_menu': out[name] = glass_image(*GLASS_MENU, fill=GLASS_SHEET_FILL)
             elif g == 'pil:glass_sort': out[name] = glass_image(*GLASS_SORT, fill=GLASS_SHEET_FILL)
+            elif g == 'pil:glass_rand': out[name] = glass_image(*GLASS_RAND, pressed, fill=GLASS_RAND_DOWN if pressed else GLASS_SHEET_FILL)
             elif g.startswith('pil:'): out[name] = pil_glyph(g[4:], px, rgb, alpha)
             elif rest: out[name] = np_disc(px, rest[0], NP_DISC_ALPHA_DOWN if pressed else NP_DISC_ALPHA, g, ink, rgb)
             else: out[name] = glyph_fit(g, px, px, rgb, (px - ink) // 2, 1.5 if ink < 22 else None)   # the small mode / queue glyphs keep a 1.5 px stroke

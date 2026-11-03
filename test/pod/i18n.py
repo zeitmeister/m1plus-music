@@ -202,7 +202,7 @@ def run(ctx):
         lt = tree.find('label_title')
         keys = [(r.label, [c for c in tree.find(f'pod_row{i}').children if c.type == 'hscroll_label'][0].w) for i, r in enumerate(page.rows) if pod_pages.row_kind(r) not in ('value', 'info')]   # a value row's label shares its room with the value: checked below
         for loc in LOC:
-            if pod_i18n.key_for(page.title) and page.kind != 'songs':   # the Songs page's small title is hidden by the payload where it does not fit (test/pod/songs.py)
+            if pod_i18n.key_for(page.title) and page.kind not in ('songs', 'grid'):   # the Songs and Albums pages' small titles are hidden by the payload where they do not fit (test/pod/songs.py, albums.py; checked below)
                 w = width(tr_text(loc, pod_i18n.key_for(page.title)), title_px)
                 if w > lt.w: over.append((page.key, 'title', loc, w, lt.w))
             for english, room in keys:
@@ -219,10 +219,10 @@ def run(ctx):
                 if w > cap.w - 4: hdr_over.append((page.key, title, loc, w, cap.w))
     expect(not hdr_over, f'every Extras section header (Play, Library, Collections, Tools) fits its label in all 13 languages at {pod_ui.HDR_PX} px ({hdr_over[:4]})')
     albums_tree = awtk_ui.parse(open(os.path.join(WORK, RAW, 'ui', pod_pages.ALBUMS.key + '.bin'), 'rb').read())
-    albums_lbl, cf_btn = albums_tree.find('label_title'), albums_tree.find('btn_coverflow')
-    over = [(loc, width(tr_text(loc, pod_i18n.key_for('Albums')), title_px)) for loc in LOC
-            if albums_lbl.x + width(tr_text(loc, pod_i18n.key_for('Albums')), title_px) > cf_btn.x]
-    expect(not over and albums_lbl.x + albums_lbl.w == cf_btn.x == A['NAV_CF_X'], f'the Albums title ends before the Cover Flow button (x {cf_btn.x}) in all languages, at {title_px} px ({over})')
+    albums_lbl, rnd_btn = albums_tree.find('label_title'), albums_tree.find('btn_random')
+    over = sorted(loc for loc in LOC if width(tr_text(loc, pod_i18n.key_for('Albums')), title_px) > albums_lbl.w)
+    expect(albums_lbl.x + albums_lbl.w == rnd_btn.x == A['NAV_RAND_X'] and 'en_US' not in over and over == ['ja_JP', 'ru_RU', 'sp_ES', 'uk_UK'],
+           f'the Albums title ends at the dice (x {rnd_btn.x}); at {title_px} px it fits but in Japanese, Spanish, Russian and Ukrainian, where the payload hides it ({over})')
     # the artist page's title (the artist's name, set at run time) is cut at the Songs button (NAV_VIEW_X): the page's own
     # title text, which shows until then, fits that room in every language
     cf_title = cover.find('label_title')
